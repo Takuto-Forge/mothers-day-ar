@@ -1,25 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function ARPage() {
   const [started, setStarted] = useState(false);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!started) return;
 
     const aframeScript = document.createElement("script");
+
     aframeScript.src =
       "https://aframe.io/releases/1.5.0/aframe.min.js";
 
     aframeScript.onload = () => {
       const mindarScript = document.createElement("script");
+
       mindarScript.src =
         "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js";
 
       mindarScript.onload = () => {
         const scene = document.createElement("a-scene");
 
+        // fullscreen
         scene.style.position = "fixed";
         scene.style.top = "0";
         scene.style.left = "0";
@@ -54,7 +59,6 @@ export default function ARPage() {
             <video
               id="flowerVideo"
               src="/ar/flower.mp4"
-              autoplay
               loop
               muted
               playsinline
@@ -63,10 +67,15 @@ export default function ARPage() {
             ></video>
           </a-assets>
 
-          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+          <a-camera
+            position="0 0 0"
+            look-controls="enabled: false"
+          ></a-camera>
 
-          <a-entity id="target" mindar-image-target="targetIndex: 0">
-
+          <a-entity
+            id="target"
+            mindar-image-target="targetIndex: 0"
+          >
             <a-plane
               id="flowerPlane"
               material="shader: flat; src: #flowerVideo"
@@ -75,7 +84,6 @@ export default function ARPage() {
               height="1"
               visible="false"
             ></a-plane>
-
           </a-entity>
         `;
 
@@ -89,18 +97,7 @@ export default function ARPage() {
           loadingUI.style.display = "none";
         }
 
-        // 動画再生
-        setTimeout(() => {
-          const video = document.getElementById(
-            "flowerVideo"
-          ) as HTMLVideoElement | null;
-
-          if (video) {
-            video.play().catch(console.error);
-          }
-        }, 1000);
-
-        // marker検出
+        // target取得
         setTimeout(() => {
           const target =
             document.getElementById("target");
@@ -108,22 +105,69 @@ export default function ARPage() {
           const plane =
             document.getElementById("flowerPlane");
 
-          if (!target || !plane) return;
+          const video = document.getElementById(
+            "flowerVideo"
+          ) as HTMLVideoElement | null;
 
-          target.addEventListener("targetFound", () => {
-            plane.setAttribute("visible", "true");
-          });
+          if (
+            !target ||
+            !plane ||
+            !video
+          )
+            return;
 
-          target.addEventListener("targetLost", () => {
-            plane.setAttribute("visible", "false");
-          });
+          // marker認識
+          target.addEventListener(
+            "targetFound",
+            async () => {
+              plane.setAttribute(
+                "visible",
+                "true"
+              );
+
+              video.currentTime = 0;
+
+              await video
+                .play()
+                .catch(console.error);
+
+              if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+
+                await audioRef.current
+                  .play()
+                  .catch(console.error);
+              }
+            }
+          );
+
+          // marker見失い
+          target.addEventListener(
+            "targetLost",
+            () => {
+              plane.setAttribute(
+                "visible",
+                "false"
+              );
+
+              video.pause();
+
+              if (audioRef.current) {
+                audioRef.current.pause();
+              }
+            }
+          );
         }, 1500);
       };
 
-      document.body.appendChild(mindarScript);
+      document.body.appendChild(
+        mindarScript
+      );
     };
 
-    document.body.appendChild(aframeScript);
+    document.body.appendChild(
+      aframeScript
+    );
   }, [started]);
 
   // Start画面
@@ -142,7 +186,14 @@ export default function ARPage() {
           gap: "20px",
         }}
       >
-        <div>Mother's Day AR</div>
+        <div
+          style={{
+            fontSize: "24px",
+            letterSpacing: "2px",
+          }}
+        >
+          Mother's Day AR
+        </div>
 
         <button
           style={{
@@ -152,17 +203,16 @@ export default function ARPage() {
             color: "black",
             border: "none",
             borderRadius: "999px",
+            cursor: "pointer",
           }}
-          onClick={async () => {
-            const audio = new Audio("/audio/bgm.mp3");
+          onClick={() => {
+            const audio = new Audio(
+              "/audio/bgm.mp3"
+            );
 
             audio.loop = true;
 
-            try {
-              await audio.play();
-            } catch (e) {
-              console.error(e);
-            }
+            audioRef.current = audio;
 
             setStarted(true);
           }}
@@ -173,7 +223,7 @@ export default function ARPage() {
     );
   }
 
-  // Loading画面
+  // Loading
   return (
     <div
       id="loadingUI"
